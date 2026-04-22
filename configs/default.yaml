@@ -1,0 +1,82 @@
+data:
+  input_dir: "~/Desktop/footage"
+  processed_dir: "data/processed"
+  resolution: [720, 1280]
+  fps: 30
+  baseline_mm: 12.0
+  train_val_split: 0.8
+  rotation:
+    cam0: "ccw"
+    cam1: "cw"
+  left_cam: "cam0"
+  right_cam: "cam1"
+  sync:
+    align_seconds: 5
+    max_offset_frames: 90
+
+model:
+  # One of: midas, dpt_hybrid, depth_anything_v2_small/base/large, zoe
+  # zoe = metric depth (recommended if you trust the 12mm baseline scaling).
+  # depth_anything_v2_small = best generalization, relative depth, smallest model.
+  depth_model: "dpt_hybrid"
+  refinement_channels: 16
+  refinement_blocks: 4
+  refiner_type: "resnet18"    # "unet" (light, fits small GPUs) or "resnet18" (stronger)
+  disparity_init_scale: 30.0  # used when depth_model outputs relative depth
+  disparity_init_shift: 0.0
+  init_focal_px: 900.0        # used when depth_model is metric ("zoe")
+
+training:
+  batch_size: 1
+  num_workers: 4
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs: 60
+  use_disparity_gt: true      # requires running data/build_disparity.py first
+  use_temporal: true
+  loss_weights:
+    l1: 1.0
+    perceptual: 0.5
+    ssim: 0.2
+    stereo_consistency: 0.1
+    smoothness: 0.002
+    disp_sup: 1.0             # weight on cached disparity supervision; 0 disables
+    temporal: 0.0             # disabled for initial training; enable for fine-tuning pass
+  num_gpus: 1
+  mixed_precision: false
+  checkpoint_dir: "checkpoints"
+  log_dir: "runs"
+  save_every: 5
+  val_every: 1
+  seed: 42
+  augment:
+    hflip: true
+    color_jitter: 0.25
+    random_crop: true
+    crop_size: [384, 640]
+    elastic: true
+    elastic_alpha: 80
+    elastic_sigma: 10
+    gaussian_noise: 8.0
+    random_blur: true
+    jpeg_artifact: true
+  external_datasets: []      # list of paths to external stereo datasets (e.g. KITTI, Flickr1024)
+
+inference:
+  checkpoint: "checkpoints/best.pt"
+  input_dir: "input/"             # drop videos here
+  output_dir: "output/"           # stereo results go here
+  output_format: "side_by_side"   # "side_by_side" or "separate"
+  apply_color_transform: true
+
+evaluate:
+  checkpoint: "checkpoints/best.pt"
+  left_frame: "data/processed/left/0000050.png"
+  right_frame: "data/processed/right/0000050.png"
+  output_image: "comparison.png"
+
+color_transform:
+  enabled: true
+  method: "brettel"
+  s_cone_peak_nm: 430.0
+  l_cone_peak_nm: 555.0
